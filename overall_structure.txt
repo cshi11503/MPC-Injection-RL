@@ -1,0 +1,25 @@
+MPC-Injection-RL/
+│
+├── controllers/
+│   ├── mpc.py                 # From Optimal Control HW2
+│   ├── ocp.py                 # From Optimal Control HW2
+│   └── solvers.py             # From Optimal Control HW2
+│
+├── environment/
+│   └── navigation_env.py      # 2D navigation with circular obstacles
+│
+├── agents/
+│   └── sac.py                 # Soft Actor-Critic (SAC)
+│
+├── training/
+│   ├── train_sac.py           # Standard SAC baseline
+│   └── train_mpc_injection.py # SAC + MPC-generated experience
+│
+├── experiments/
+│   └── evaluate.py            # Compare injection ratios and metrics
+│
+├── results/                   # Training curves and experiment results
+│
+├── requirements.txt           # Python dependencies
+├── .gitignore
+└── README.md
