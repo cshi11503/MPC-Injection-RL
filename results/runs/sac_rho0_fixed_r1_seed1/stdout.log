@@ -1,0 +1,128 @@
+Run: sac_rho0_fixed_r1_seed1 | rho=0.0 | 100000 steps | device=cpu | obs_dim=9
+Output: results/runs\sac_rho0_fixed_r1_seed1
+step    5000 | det: out_of_bounds R= -11.31 | sto: succ 0.00 coll 1.00 R= -10.53 | train succ(last20) 0.00 | alpha 1.000 | 4453.8 steps/s | ETA   0.4 min
+  [train] step    6000 | episodes   110 | last20: goal  0 coll 20 timeout  0 | critic 5.472 | Q   2.87 | alpha 0.864 | entropy  1.35
+  [train] step    7000 | episodes   118 | last20: goal  0 coll 19 timeout  1 | critic 5.062 | Q   5.80 | alpha 0.642 | entropy  1.23
+  [train] step    8000 | episodes   128 | last20: goal  0 coll 18 timeout  2 | critic 4.122 | Q   7.98 | alpha 0.481 | entropy  1.01
+  [train] step    9000 | episodes   138 | last20: goal  0 coll 19 timeout  1 | critic 4.455 | Q   9.57 | alpha 0.362 | entropy  0.87
+  [train] step   10000 | episodes   144 | last20: goal  0 coll 19 timeout  1 | critic 4.674 | Q  10.57 | alpha 0.272 | entropy  0.73
+step   10000 | det:       timeout R=  -0.31 | sto: succ 0.00 coll 0.00 R=  -0.05 | train succ(last20) 0.00 | alpha 0.235 |  78.6 steps/s | ETA  19.1 min
+  [train] step   11000 | episodes   147 | last20: goal  0 coll 16 timeout  4 | critic 4.298 | Q  11.26 | alpha 0.205 | entropy  0.57
+  [train] step   12000 | episodes   151 | last20: goal  0 coll 12 timeout  8 | critic 3.684 | Q  11.74 | alpha 0.154 | entropy  0.42
+  [train] step   13000 | episodes   154 | last20: goal  0 coll  9 timeout 11 | critic 3.447 | Q  12.04 | alpha 0.116 | entropy  0.27
+  [train] step   14000 | episodes   157 | last20: goal  0 coll  6 timeout 14 | critic 3.180 | Q  12.24 | alpha 0.088 | entropy  0.10
+  [train] step   15000 | episodes   161 | last20: goal  0 coll  2 timeout 18 | critic 2.706 | Q  12.40 | alpha 0.067 | entropy -0.12
+step   15000 | det:       timeout R=   0.56 | sto: succ 0.00 coll 0.00 R=   0.60 | train succ(last20) 0.00 | alpha 0.058 |  59.1 steps/s | ETA  24.0 min
+  [train] step   16000 | episodes   164 | last20: goal  0 coll  0 timeout 20 | critic 2.476 | Q  12.59 | alpha 0.051 | entropy -0.35
+  [train] step   17000 | episodes   167 | last20: goal  0 coll  0 timeout 20 | critic 2.050 | Q  12.74 | alpha 0.039 | entropy -0.49
+  [train] step   18000 | episodes   171 | last20: goal  0 coll  0 timeout 20 | critic 1.850 | Q  12.86 | alpha 0.030 | entropy -0.71
+  [train] step   19000 | episodes   174 | last20: goal  0 coll  0 timeout 20 | critic 1.652 | Q  12.95 | alpha 0.023 | entropy -0.84
+  [train] step   20000 | episodes   177 | last20: goal  0 coll  0 timeout 20 | critic 1.522 | Q  12.96 | alpha 0.018 | entropy -1.14
+step   20000 | det:       timeout R=   1.00 | sto: succ 0.00 coll 0.00 R=   1.03 | train succ(last20) 0.00 | alpha 0.016 |  52.4 steps/s | ETA  25.4 min
+  [train] step   21000 | episodes   181 | last20: goal  0 coll  0 timeout 20 | critic 1.472 | Q  12.90 | alpha 0.015 | entropy -1.37
+  [train] step   22000 | episodes   184 | last20: goal  0 coll  0 timeout 20 | critic 1.275 | Q  12.86 | alpha 0.013 | entropy -1.92
+  [train] step   23000 | episodes   187 | last20: goal  0 coll  0 timeout 20 | critic 1.169 | Q  12.85 | alpha 0.013 | entropy -2.04
+  [train] step   24000 | episodes   191 | last20: goal  0 coll  0 timeout 20 | critic 1.061 | Q  12.88 | alpha 0.014 | entropy -2.13
+  [train] step   25000 | episodes   194 | last20: goal  0 coll  0 timeout 20 | critic 1.009 | Q  12.98 | alpha 0.016 | entropy -2.11
+step   25000 | det:       timeout R=   0.38 | sto: succ 0.00 coll 0.00 R=   0.99 | train succ(last20) 0.00 | alpha 0.017 |  49.3 steps/s | ETA  25.3 min
+  [train] step   26000 | episodes   197 | last20: goal  0 coll  0 timeout 20 | critic 0.964 | Q  13.11 | alpha 0.017 | entropy -1.98
+  [train] step   27000 | episodes   201 | last20: goal  0 coll  0 timeout 20 | critic 0.893 | Q  13.24 | alpha 0.016 | entropy -1.95
+  [train] step   28000 | episodes   204 | last20: goal  0 coll  0 timeout 20 | critic 0.866 | Q  13.24 | alpha 0.015 | entropy -1.95
+  [train] step   29000 | episodes   207 | last20: goal  0 coll  0 timeout 20 | critic 0.783 | Q  13.17 | alpha 0.013 | entropy -1.92
+  [train] step   30000 | episodes   211 | last20: goal  0 coll  0 timeout 20 | critic 0.757 | Q  13.03 | alpha 0.012 | entropy -1.95
+step   30000 | det:       timeout R=   0.23 | sto: succ 0.00 coll 0.00 R=   0.26 | train succ(last20) 0.00 | alpha 0.011 |  47.4 steps/s | ETA  24.6 min
+  [train] step   31000 | episodes   214 | last20: goal  0 coll  0 timeout 20 | critic 0.733 | Q  12.82 | alpha 0.011 | entropy -1.98
+  [train] step   32000 | episodes   217 | last20: goal  0 coll  0 timeout 20 | critic 0.687 | Q  12.60 | alpha 0.011 | entropy -2.00
+  [train] step   33000 | episodes   221 | last20: goal  0 coll  0 timeout 20 | critic 0.655 | Q  12.37 | alpha 0.011 | entropy -2.00
+  [train] step   34000 | episodes   224 | last20: goal  0 coll  0 timeout 20 | critic 0.560 | Q  12.14 | alpha 0.012 | entropy -2.07
+  [train] step   35000 | episodes   227 | last20: goal  0 coll  0 timeout 20 | critic 0.551 | Q  11.96 | alpha 0.013 | entropy -2.17
+step   35000 | det:       timeout R=   6.09 | sto: succ 0.00 coll 0.00 R=   6.09 | train succ(last20) 0.00 | alpha 0.014 |  46.1 steps/s | ETA  23.5 min
+  [train] step   36000 | episodes   231 | last20: goal  0 coll  0 timeout 20 | critic 0.532 | Q  11.88 | alpha 0.015 | entropy -2.11
+  [train] step   37000 | episodes   234 | last20: goal  0 coll  0 timeout 20 | critic 0.494 | Q  11.91 | alpha 0.016 | entropy -2.05
+  [train] step   38000 | episodes   237 | last20: goal  0 coll  0 timeout 20 | critic 0.517 | Q  12.03 | alpha 0.018 | entropy -2.09
+  [train] step   39000 | episodes   241 | last20: goal  0 coll  0 timeout 20 | critic 0.485 | Q  12.24 | alpha 0.018 | entropy -1.98
+  [train] step   40000 | episodes   244 | last20: goal  0 coll  0 timeout 20 | critic 0.460 | Q  12.56 | alpha 0.017 | entropy -1.93
+step   40000 | det:       timeout R=   4.38 | sto: succ 0.00 coll 0.00 R=   4.40 | train succ(last20) 0.00 | alpha 0.016 |  45.2 steps/s | ETA  22.1 min
+  [train] step   41000 | episodes   247 | last20: goal  0 coll  0 timeout 20 | critic 0.453 | Q  12.90 | alpha 0.016 | entropy -1.98
+  [train] step   42000 | episodes   251 | last20: goal  0 coll  0 timeout 20 | critic 0.438 | Q  13.11 | alpha 0.015 | entropy -1.90
+  [train] step   43000 | episodes   254 | last20: goal  0 coll  0 timeout 20 | critic 0.420 | Q  13.16 | alpha 0.013 | entropy -1.95
+  [train] step   44000 | episodes   257 | last20: goal  0 coll  0 timeout 20 | critic 0.375 | Q  13.07 | alpha 0.012 | entropy -1.88
+  [train] step   45000 | episodes   261 | last20: goal  0 coll  0 timeout 20 | critic 0.332 | Q  12.81 | alpha 0.010 | entropy -1.81
+step   45000 | det:       timeout R=   4.78 | sto: succ 0.00 coll 0.00 R=   4.61 | train succ(last20) 0.00 | alpha 0.009 |  44.5 steps/s | ETA  20.6 min
+  [train] step   46000 | episodes   264 | last20: goal  0 coll  0 timeout 20 | critic 0.352 | Q  12.48 | alpha 0.008 | entropy -1.92
+  [train] step   47000 | episodes   267 | last20: goal  0 coll  0 timeout 20 | critic 0.314 | Q  12.11 | alpha 0.007 | entropy -1.93
+  [train] step   48000 | episodes   271 | last20: goal  0 coll  0 timeout 20 | critic 0.326 | Q  11.76 | alpha 0.008 | entropy -2.23
+  [train] step   49000 | episodes   274 | last20: goal  0 coll  0 timeout 20 | critic 0.278 | Q  11.47 | alpha 0.010 | entropy -2.08
+  [train] step   50000 | episodes   280 | last20: goal  3 coll  1 timeout 16 | critic 0.249 | Q  11.17 | alpha 0.010 | entropy -1.96
+step   50000 | det:          goal R=  20.00 | sto: succ 0.70 coll 0.00 R=  15.18 | train succ(last20) 0.15 | alpha 0.010 |  43.9 steps/s | ETA  19.0 min
+  [train] step   51000 | episodes   286 | last20: goal  6 coll  2 timeout 12 | critic 0.259 | Q  10.89 | alpha 0.010 | entropy -2.05
+  [train] step   52000 | episodes   299 | last20: goal  3 coll 15 timeout  2 | critic 0.274 | Q  10.65 | alpha 0.010 | entropy -1.94
+  [train] step   53000 | episodes   303 | last20: goal  1 coll 16 timeout  3 | critic 0.250 | Q  10.41 | alpha 0.009 | entropy -1.85
+  [train] step   54000 | episodes   307 | last20: goal  0 coll 14 timeout  6 | critic 0.282 | Q  10.20 | alpha 0.008 | entropy -2.07
+  [train] step   55000 | episodes   310 | last20: goal  0 coll 11 timeout  9 | critic 0.284 | Q  10.02 | alpha 0.009 | entropy -2.02
+step   55000 | det:       timeout R=   6.64 | sto: succ 0.00 coll 0.00 R=   6.64 | train succ(last20) 0.00 | alpha 0.009 |  42.4 steps/s | ETA  17.7 min
+  [train] step   56000 | episodes   313 | last20: goal  0 coll  8 timeout 12 | critic 0.270 | Q   9.86 | alpha 0.009 | entropy -2.02
+  [train] step   57000 | episodes   317 | last20: goal  0 coll  4 timeout 16 | critic 0.218 | Q   9.69 | alpha 0.010 | entropy -2.07
+  [train] step   58000 | episodes   320 | last20: goal  0 coll  1 timeout 19 | critic 0.199 | Q   9.56 | alpha 0.010 | entropy -1.98
+  [train] step   59000 | episodes   323 | last20: goal  0 coll  0 timeout 20 | critic 0.177 | Q   9.45 | alpha 0.010 | entropy -1.97
+  [train] step   60000 | episodes   327 | last20: goal  0 coll  0 timeout 20 | critic 0.170 | Q   9.38 | alpha 0.010 | entropy -2.10
+step   60000 | det:       timeout R=   4.97 | sto: succ 0.00 coll 0.00 R=   4.95 | train succ(last20) 0.00 | alpha 0.011 |  41.9 steps/s | ETA  15.9 min
+  [train] step   61000 | episodes   330 | last20: goal  0 coll  0 timeout 20 | critic 0.161 | Q   9.28 | alpha 0.011 | entropy -1.93
+  [train] step   62000 | episodes   333 | last20: goal  0 coll  0 timeout 20 | critic 0.174 | Q   9.12 | alpha 0.009 | entropy -1.80
+  [train] step   63000 | episodes   337 | last20: goal  0 coll  0 timeout 20 | critic 0.158 | Q   8.90 | alpha 0.007 | entropy -1.89
+  [train] step   64000 | episodes   340 | last20: goal  0 coll  0 timeout 20 | critic 0.139 | Q   8.66 | alpha 0.006 | entropy -1.95
+  [train] step   65000 | episodes   343 | last20: goal  0 coll  0 timeout 20 | critic 0.137 | Q   8.40 | alpha 0.006 | entropy -1.97
+step   65000 | det:       timeout R=   5.30 | sto: succ 0.00 coll 0.00 R=   5.32 | train succ(last20) 0.00 | alpha 0.006 |  38.6 steps/s | ETA  15.1 min
+  [train] step   66000 | episodes   347 | last20: goal  0 coll  0 timeout 20 | critic 0.124 | Q   8.12 | alpha 0.006 | entropy -2.01
+  [train] step   67000 | episodes   350 | last20: goal  0 coll  0 timeout 20 | critic 0.122 | Q   7.87 | alpha 0.006 | entropy -1.94
+  [train] step   68000 | episodes   353 | last20: goal  0 coll  0 timeout 20 | critic 0.116 | Q   7.61 | alpha 0.005 | entropy -1.95
+  [train] step   69000 | episodes   357 | last20: goal  0 coll  0 timeout 20 | critic 0.118 | Q   7.36 | alpha 0.005 | entropy -1.96
+  [train] step   70000 | episodes   360 | last20: goal  0 coll  0 timeout 20 | critic 0.109 | Q   7.10 | alpha 0.005 | entropy -1.97
+step   70000 | det:       timeout R=   4.27 | sto: succ 0.00 coll 0.00 R=   4.27 | train succ(last20) 0.00 | alpha 0.005 |  34.2 steps/s | ETA  14.6 min
+  [train] step   71000 | episodes   363 | last20: goal  0 coll  0 timeout 20 | critic 0.101 | Q   6.86 | alpha 0.005 | entropy -2.03
+  [train] step   72000 | episodes   367 | last20: goal  0 coll  0 timeout 20 | critic 0.107 | Q   6.68 | alpha 0.005 | entropy -2.01
+  [train] step   73000 | episodes   370 | last20: goal  0 coll  0 timeout 20 | critic 0.092 | Q   6.49 | alpha 0.005 | entropy -1.99
+  [train] step   74000 | episodes   373 | last20: goal  0 coll  0 timeout 20 | critic 0.099 | Q   6.32 | alpha 0.005 | entropy -2.07
+  [train] step   75000 | episodes   377 | last20: goal  1 coll  0 timeout 19 | critic 0.095 | Q   6.16 | alpha 0.005 | entropy -1.94
+step   75000 | det:       timeout R=   4.05 | sto: succ 0.00 coll 0.00 R=   4.03 | train succ(last20) 0.05 | alpha 0.005 |  31.3 steps/s | ETA  13.3 min
+  [train] step   76000 | episodes   382 | last20: goal  2 coll  0 timeout 18 | critic 0.106 | Q   6.02 | alpha 0.005 | entropy -2.04
+  [train] step   77000 | episodes   388 | last20: goal  6 coll  0 timeout 14 | critic 0.109 | Q   5.91 | alpha 0.006 | entropy -2.06
+  [train] step   78000 | episodes   394 | last20: goal 10 coll  0 timeout 10 | critic 0.104 | Q   5.85 | alpha 0.006 | entropy -2.11
+  [train] step   79000 | episodes   404 | last20: goal 17 coll  0 timeout  3 | critic 0.115 | Q   5.84 | alpha 0.007 | entropy -2.05
+  [train] step   80000 | episodes   414 | last20: goal 20 coll  0 timeout  0 | critic 0.129 | Q   5.88 | alpha 0.007 | entropy -1.98
+step   80000 | det:       timeout R=   7.95 | sto: succ 0.40 coll 0.00 R=  12.34 | train succ(last20) 1.00 | alpha 0.007 |  29.8 steps/s | ETA  11.2 min
+  [train] step   81000 | episodes   426 | last20: goal 20 coll  0 timeout  0 | critic 0.131 | Q   5.94 | alpha 0.006 | entropy -2.00
+  [train] step   82000 | episodes   437 | last20: goal 20 coll  0 timeout  0 | critic 0.142 | Q   6.04 | alpha 0.008 | entropy -2.23
+  [train] step   83000 | episodes   446 | last20: goal 20 coll  0 timeout  0 | critic 0.134 | Q   6.17 | alpha 0.009 | entropy -2.13
+  [train] step   84000 | episodes   455 | last20: goal 20 coll  0 timeout  0 | critic 0.136 | Q   6.28 | alpha 0.010 | entropy -2.02
+  [train] step   85000 | episodes   464 | last20: goal 20 coll  0 timeout  0 | critic 0.142 | Q   6.40 | alpha 0.010 | entropy -2.00
+step   85000 | det:       timeout R=   7.78 | sto: succ 0.00 coll 0.00 R=   7.76 | train succ(last20) 1.00 | alpha 0.010 |  29.9 steps/s | ETA   8.4 min
+  [train] step   86000 | episodes   473 | last20: goal 20 coll  0 timeout  0 | critic 0.146 | Q   6.51 | alpha 0.010 | entropy -1.92
+  [train] step   87000 | episodes   480 | last20: goal 20 coll  0 timeout  0 | critic 0.147 | Q   6.61 | alpha 0.009 | entropy -1.97
+  [train] step   88000 | episodes   487 | last20: goal 19 coll  0 timeout  1 | critic 0.128 | Q   6.71 | alpha 0.009 | entropy -1.99
+  [train] step   89000 | episodes   498 | last20: goal 18 coll  0 timeout  2 | critic 0.143 | Q   6.82 | alpha 0.009 | entropy -2.04
+  [train] step   90000 | episodes   507 | last20: goal 19 coll  0 timeout  1 | critic 0.134 | Q   6.96 | alpha 0.009 | entropy -2.01
+step   90000 | det:          goal R=  20.17 | sto: succ 1.00 coll 0.00 R=  20.22 | train succ(last20) 0.95 | alpha 0.009 |  29.5 steps/s | ETA   5.6 min
+  [train] step   91000 | episodes   520 | last20: goal 20 coll  0 timeout  0 | critic 0.143 | Q   7.16 | alpha 0.009 | entropy -2.03
+  [train] step   92000 | episodes   531 | last20: goal 19 coll  0 timeout  1 | critic 0.133 | Q   7.38 | alpha 0.010 | entropy -2.04
+  [train] step   93000 | episodes   541 | last20: goal 20 coll  0 timeout  0 | critic 0.136 | Q   7.62 | alpha 0.010 | entropy -1.99
+  [train] step   94000 | episodes   556 | last20: goal 20 coll  0 timeout  0 | critic 0.138 | Q   7.87 | alpha 0.010 | entropy -2.02
+  [train] step   95000 | episodes   570 | last20: goal 20 coll  0 timeout  0 | critic 0.134 | Q   8.10 | alpha 0.010 | entropy -1.97
+step   95000 | det:       timeout R=   7.89 | sto: succ 0.00 coll 0.00 R=   7.89 | train succ(last20) 1.00 | alpha 0.010 |  29.7 steps/s | ETA   2.8 min
+  [train] step   96000 | episodes   583 | last20: goal 19 coll  1 timeout  0 | critic 0.143 | Q   8.29 | alpha 0.009 | entropy -1.95
+  [train] step   97000 | episodes   598 | last20: goal 16 coll  4 timeout  0 | critic 0.145 | Q   8.40 | alpha 0.008 | entropy -1.90
+  [train] step   98000 | episodes   607 | last20: goal 16 coll  4 timeout  0 | critic 0.163 | Q   8.45 | alpha 0.007 | entropy -1.95
+  [train] step   99000 | episodes   611 | last20: goal 14 coll  3 timeout  3 | critic 0.160 | Q   8.53 | alpha 0.008 | entropy -2.14
+  [train] step  100000 | episodes   614 | last20: goal 11 coll  3 timeout  6 | critic 0.174 | Q   8.67 | alpha 0.009 | entropy -2.06
+step  100000 | det:       timeout R=   1.25 | sto: succ 0.00 coll 0.00 R=   1.21 | train succ(last20) 0.55 | alpha 0.009 |  30.1 steps/s | ETA   0.0 min
+
+Summary: {
+  "run_name": "sac_rho0_fixed_r1_seed1",
+  "rho": 0.0,
+  "seed": 1,
+  "total_steps": 100000,
+  "episodes": 614,
+  "steps_to_success_threshold": 90000,
+  "success_threshold": 0.8,
+  "wall_time_min": 55.39717821677526
+}

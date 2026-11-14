@@ -1,0 +1,10 @@
+{
+  "run_name": "sac_rho0_fixed_seed0",
+  "rho": 0.0,
+  "seed": 0,
+  "total_steps": 100000,
+  "episodes": 466,
+  "steps_to_success_threshold": null,
+  "success_threshold": 0.8,
+  "wall_time_min": 54.52662950356801
+}

@@ -1,0 +1,69 @@
+{
+  "args": {
+    "rho": 0.0,
+    "mpc_data": null,
+    "seed": 1,
+    "layout": "fixed",
+    "obstacle_radius": 1.0,
+    "run_name": "sac_rho0_fixed_r1_seed1",
+    "out_dir": "results/runs",
+    "total_steps": 100000,
+    "warmup": 5000,
+    "batch_size": 256,
+    "updates_per_step": 1,
+    "buffer_size": 1000000,
+    "lr": 0.0003,
+    "gamma": 0.99,
+    "tau": 0.005,
+    "hidden": [
+      256,
+      256
+    ],
+    "init_alpha": 1.0,
+    "eval_every": 5000,
+    "eval_episodes": 10,
+    "success_threshold": 0.8,
+    "log_every": 1000,
+    "device": "cpu",
+    "threads": 2
+  },
+  "env": {
+    "arena_size": 10.0,
+    "dt": 0.1,
+    "a_max": 2.0,
+    "v_max": 3.0,
+    "max_steps": 300,
+    "robot_radius": 0.1,
+    "goal_radius": 0.3,
+    "layout": "fixed",
+    "start": [
+      1.0,
+      1.0
+    ],
+    "goal": [
+      9.0,
+      9.0
+    ],
+    "obstacles": [
+      [
+        5.0,
+        5.0,
+        1.0
+      ]
+    ],
+    "n_obstacles": 4,
+    "obstacle_radius_range": [
+      0.5,
+      1.2
+    ],
+    "passage_width": 0.6,
+    "start_goal_clearance": 0.3,
+    "min_start_goal_dist": 6.0,
+    "p_blocking": 1.0,
+    "max_layout_tries": 2000,
+    "w_progress": 1.0,
+    "w_goal": 10.0,
+    "w_collision": 10.0,
+    "w_time": 0.01
+  }
+}
