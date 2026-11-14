@@ -1,0 +1,6 @@
+numpy
+matplotlib
+torch
+pytest
+# MPC side (from Optimal Control HW2)
+jax

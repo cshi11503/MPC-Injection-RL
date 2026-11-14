@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# training outputs (checkpoints, logs); commit selected final results explicitly
+results/runs/
