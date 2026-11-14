@@ -268,6 +268,7 @@ def train(args):
             row = {"step": step, "episodes": n_episodes, "time_s": time.time() - t0, **row}
             eval_log.log(row)
             eval_trajs.append((step, det_traj, row["det_event"]))
+            agent.save(os.path.join(run_dir, "latest.pt"))   # most recent policy, for inspection mid-run
 
             # sample efficiency: first eval where stochastic success rate >= threshold
             if first_hit_step is None and row["sto_success_rate"] >= args.success_threshold:
