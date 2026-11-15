@@ -32,8 +32,16 @@ class MPC:
 
         # Navigation parameters
         self.a_max = 2.0
-        self.waypoint_tolerance = 0.35
+        self.waypoint_tolerance = 1.0     # lookahead along the densified path
         self.obstacle_margin = 0.5
+        # start/goal may be closer than 0.5 to an obstacle and passages can be as narrow
+        # as 0.6: if no path exists at one margin, the planner retries with the next
+        self.obstacle_margins = (0.5, 0.35, 0.25)
+        # The planned path is resampled every `waypoint_spacing` so the MPC always tracks a
+        # nearby point ON the path (lookahead ~ waypoint_tolerance). Tracking a far corner
+        # waypoint with per-axis-saturated accelerations bows off the straight segment
+        # and hits obstacles.
+        self.waypoint_spacing = 0.2
         self.waypoints = []
         self.waypoint_index = 0
 
@@ -238,7 +246,13 @@ class MPC:
 
         path.reverse()
 
-        self.waypoints = path[1:]
+        # Resample each straight segment into closely spaced waypoints
+        dense = []
+        for a, b in zip(path[:-1], path[1:]):
+            n = max(int(np.ceil(np.linalg.norm(b - a) / self.waypoint_spacing)), 1)
+            dense += [a + (b - a) * k / n for k in range(1, n + 1)]
+
+        self.waypoints = dense
         self.waypoint_index = 0
 
         return self.waypoints
@@ -254,12 +268,19 @@ class MPC:
 
         # Plan a route when starting a new episode
         if not self.waypoints:
-            self.plan_waypoints(
-                position,
-                env.goal,
-                env.obstacles,
-                env.cfg.arena_size,
-            )
+            for margin in self.obstacle_margins:
+                self.obstacle_margin = margin
+                try:
+                    self.plan_waypoints(
+                        position,
+                        env.goal,
+                        env.obstacles,
+                        env.cfg.arena_size,
+                    )
+                    break
+                except RuntimeError:
+                    if margin == self.obstacle_margins[-1]:
+                        raise
 
         # Move to the next waypoint when sufficiently close
         while self.waypoint_index < len(self.waypoints) - 1:
