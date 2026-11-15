@@ -1,0 +1,29 @@
+100/2500 episodes | {'goal': 100} | 428s
+200/2500 episodes | {'goal': 200} | 584s
+300/2500 episodes | {'goal': 300} | 666s
+400/2500 episodes | {'goal': 400} | 750s
+500/2500 episodes | {'goal': 500} | 837s
+600/2500 episodes | {'goal': 600} | 931s
+700/2500 episodes | {'goal': 700} | 1020s
+800/2500 episodes | {'goal': 800} | 1107s
+900/2500 episodes | {'goal': 900} | 1202s
+1000/2500 episodes | {'goal': 1000} | 1287s
+1100/2500 episodes | {'goal': 1100} | 1360s
+1200/2500 episodes | {'goal': 1200} | 1435s
+1300/2500 episodes | {'goal': 1300} | 1512s
+1400/2500 episodes | {'goal': 1400} | 1588s
+1500/2500 episodes | {'goal': 1500} | 1662s
+1600/2500 episodes | {'goal': 1600} | 1737s
+1700/2500 episodes | {'goal': 1700} | 1811s
+1800/2500 episodes | {'goal': 1800} | 1887s
+1900/2500 episodes | {'goal': 1900} | 1961s
+2000/2500 episodes | {'goal': 2000} | 2031s
+2100/2500 episodes | {'goal': 2100} | 2100s
+2200/2500 episodes | {'goal': 2200} | 2165s
+2300/2500 episodes | {'goal': 2300} | 2231s
+2400/2500 episodes | {'goal': 2400} | 2295s
+2500/2500 episodes | {'goal': 2500} | 2358s
+
+MPC on 2500 random layouts: goal 2500 (100.0%)
+successful episodes: return 20.36 +- 0.04, steps 68.5
+saved 171347 transitions -> data/mpc_dataset.npz (2359s)
