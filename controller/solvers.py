@@ -9,7 +9,7 @@ class PDIPSolver():
     Follows the implementation of the primal-dual interior point algorithm as found in
         "CVXGEN: a code generator for embedded convex optimization", J. Mattingley and S. Boyd (2012).
     """
-    def __init__(self, max_qp_iter: int = 100, tol: float = 1e-2):
+    def __init__(self, max_qp_iter: int = 100, tol: float = 5e-2):
         """
         Attributes:
             max_qp_iter (int): maximum number of QP iterations
@@ -344,6 +344,21 @@ class PDIPSolver():
                     f"Iteration {k}: "
                     f"cost = {cost}, alpha = {alpha}"
                 )
+        if not self.has_converged():
+            r1, r2, r3, r4 = self.compute_residuals(
+                self.x0, self.s0, self.z0, self.y0
+            )
+            print("\nQP convergence diagnostics:")
+            print("Stationarity:", float(jnp.linalg.norm(r1)))
+            print("Complementarity:", float(jnp.linalg.norm(r2)))
+            print("Inequality feasibility:", float(jnp.linalg.norm(r3)))
+            print("Equality feasibility:", float(jnp.linalg.norm(r4)))
+            print("Tolerance:", self.tol)
+
+            raise RuntimeError("QP solver failed to converge.")
+
+
+        
         return costs
 
       

@@ -36,7 +36,7 @@ Collision / goal / wall checks are done along the straight segment travelled
 during the step (swept check), so a fast robot cannot "tunnel" through a thin
 obstacle or fly through the goal between two samples.
 """
-
+from __future__ import annotations
 from dataclasses import dataclass, asdict
 
 import numpy as np
