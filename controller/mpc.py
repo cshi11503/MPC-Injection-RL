@@ -33,7 +33,7 @@ class MPC:
         # Navigation parameters
         self.a_max = 2.0
         self.waypoint_tolerance = 0.35
-        self.obstacle_margin = 0.7
+        self.obstacle_margin = 0.5
         self.waypoints = []
         self.waypoint_index = 0
 
