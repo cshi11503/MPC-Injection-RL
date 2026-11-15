@@ -45,6 +45,8 @@ def parse_args(argv=None):
     p.add_argument("--layout", type=str, default="fixed", choices=["fixed", "random"])
     p.add_argument("--obstacle-radius", type=float, default=None,
                    help="fixed layout only: radius of the center obstacle (default: NavConfig value, 2.0)")
+    p.add_argument("--fixed-endpoints", action="store_true",
+                   help="random layout only: keep start (1,1) / goal (9,9), randomize only obstacles")
     p.add_argument("--run-name", type=str, default=None)
     p.add_argument("--out-dir", type=str, default="results/runs")
     # training length / schedule
@@ -66,6 +68,8 @@ def parse_args(argv=None):
     p.add_argument("--log-every", type=int, default=1_000)
     # compute
     p.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"])
+    p.add_argument("--cuda-graph", action="store_true",
+                   help="capture the SAC update as a CUDA graph (needs --device cuda; much faster)")
     p.add_argument("--threads", type=int, default=4, help="torch CPU threads (keep low when running in parallel)")
     args = p.parse_args(argv)
 
@@ -75,9 +79,14 @@ def parse_args(argv=None):
         p.error("--rho must be in [0, 1]")
     if args.obstacle_radius is not None and args.layout != "fixed":
         p.error("--obstacle-radius only applies to --layout fixed")
+    if args.fixed_endpoints and args.layout != "random":
+        p.error("--fixed-endpoints only applies to --layout random")
+    if args.cuda_graph and args.device != "cuda":
+        p.error("--cuda-graph requires --device cuda")
     if args.run_name is None:
         r_tag = f"_r{args.obstacle_radius:g}" if args.obstacle_radius is not None else ""
-        args.run_name = f"sac_rho{args.rho:g}_{args.layout}{r_tag}_seed{args.seed}"
+        e_tag = "_fixedends" if args.fixed_endpoints else ""
+        args.run_name = f"sac_rho{args.rho:g}_{args.layout}{e_tag}{r_tag}_seed{args.seed}"
     return args
 
 
@@ -85,6 +94,8 @@ def make_env(args):
     kwargs = {"layout": args.layout}
     if args.obstacle_radius is not None:
         kwargs["obstacles"] = ((5.0, 5.0, args.obstacle_radius),)
+    if args.fixed_endpoints:
+        kwargs["random_endpoints"] = False
     return NavigationEnv(**kwargs)
 
 
@@ -194,7 +205,8 @@ def train(args):
         json.dump({"args": vars(args), "env": env.config_dict()}, f, indent=2)
 
     agent = SAC(env.obs_dim, env.action_dim, hidden=tuple(args.hidden), lr=args.lr, gamma=args.gamma,
-                tau=args.tau, init_alpha=args.init_alpha, device=args.device, seed=args.seed)
+                tau=args.tau, init_alpha=args.init_alpha, device=args.device, seed=args.seed,
+                cuda_graph=args.cuda_graph)
     rl_buffer = ReplayBuffer(env.obs_dim, env.action_dim, capacity=args.buffer_size, seed=args.seed)
 
     mpc_buffer = None
@@ -247,12 +259,14 @@ def train(args):
         if step > args.warmup:
             for _ in range(args.updates_per_step):
                 batch = sample_mixed(rl_buffer, mpc_buffer, args.batch_size, args.rho)
-                for k, v in agent.update(batch).items():
+                metrics = agent.update(batch)          # None in CUDA-graph mode (kept on GPU)
+                for k, v in (metrics or {}).items():
                     loss_acc[k].append(v)
 
         # ---- 4) log training statistics ----
-        if step % args.log_every == 0 and loss_acc:
-            row = {"step": step, **{k: float(np.mean(v)) for k, v in loss_acc.items()},
+        if step % args.log_every == 0 and step > args.warmup:
+            stats = agent.pop_metrics() if args.cuda_graph else {k: float(np.mean(v)) for k, v in loss_acc.items()}
+            row = {"step": step, **stats,
                    "train_success_last20": recent.count("goal") / max(len(recent), 1),
                    "episodes": n_episodes}
             train_log.log(row)
@@ -373,8 +387,8 @@ def make_plots(run_dir, env, eval_trajs, args):
 
     # --- deterministic-policy trajectories at several points in training ---
     if eval_trajs:
-        env.reset()
-        idx = np.unique(np.linspace(0, len(eval_trajs) - 1, min(6, len(eval_trajs))).astype(int))
+        env.reset(seed=10_000)   # same layout the deterministic eval episodes ran on
+        idx =np.unique(np.linspace(0, len(eval_trajs) - 1, min(6, len(eval_trajs))).astype(int))
         fig, ax = plt.subplots(figsize=(6, 6))
         env.render(ax=ax, show_trajectory=False)
         cmap = plt.get_cmap("viridis")

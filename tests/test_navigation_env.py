@@ -141,6 +141,17 @@ def test_random_layouts_are_valid():
         assert env._line_blocked(start, goal, obs_)
 
 
+def test_random_obstacles_fixed_endpoints():
+    env = NavigationEnv(layout="random", random_endpoints=False)
+    layouts = set()
+    for seed in range(20):
+        _, info = env.reset(seed=seed)
+        assert np.allclose(info["state"][:2], env.cfg.start) and np.allclose(info["goal"], env.cfg.goal)
+        assert env._line_blocked(info["state"][:2], info["goal"], info["obstacles"])
+        layouts.add(info["obstacles"].round(6).tobytes())
+    assert len(layouts) == 20
+
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for t in tests:

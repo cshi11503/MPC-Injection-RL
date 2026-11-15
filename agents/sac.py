@@ -180,7 +180,12 @@ class SAC:
         auto_alpha: bool = True,
         device: str = "cpu",
         seed: int | None = None,
+        cuda_graph: bool = False,
     ):
+        if cuda_graph and torch.device(device).type != "cuda":
+            raise ValueError("cuda_graph=True requires device='cuda'")
+        self.cuda_graph = cuda_graph
+        self._graph = None
         if seed is not None:
             torch.manual_seed(seed)
         self.device = torch.device(device)
@@ -202,11 +207,11 @@ class SAC:
                                       device=self.device, requires_grad=True)
 
         # fused=True runs the whole Adam step as one GPU kernel (CUDA only)
-        fused = self.device.type == "cuda"
-        self.actor_opt = torch.optim.Adam(self.actor.parameters(), lr=lr, fused=fused)
-        self.critic_opt = torch.optim.Adam(list(self.q1.parameters()) + list(self.q2.parameters()),
-                                           lr=lr, fused=fused)
-        self.alpha_opt = torch.optim.Adam([self.log_alpha], lr=lr, fused=fused)
+        # capturable=True keeps Adam's step counter on the GPU so the step can be graph-captured
+        opt = dict(lr=lr, fused=self.device.type == "cuda", capturable=cuda_graph)
+        self.actor_opt = torch.optim.Adam(self.actor.parameters(), **opt)
+        self.critic_opt = torch.optim.Adam(list(self.q1.parameters()) + list(self.q2.parameters()), **opt)
+        self.alpha_opt = torch.optim.Adam([self.log_alpha], **opt)
 
     @property
     def alpha(self) -> float:
@@ -240,14 +245,55 @@ class SAC:
         soft_value = q_next - self.log_alpha.exp() * next_logp
         return reward + self.gamma * (1.0 - terminated) * soft_value
 
-    def update(self, batch: dict) -> dict:
-        obs, action, reward, next_obs, terminated = self._to_tensors(batch)
+    METRICS = ("critic_loss", "actor_loss", "alpha_loss", "alpha", "q_mean", "entropy")
 
+    def update(self, batch: dict) -> dict | None:
+        """
+        One SAC update. Eager mode returns the metrics dict.
+        CUDA-graph mode returns None; metrics accumulate on the GPU, read them with pop_metrics().
+        """
+        if self.cuda_graph:
+            return self._graph_update(batch)
+        return dict(zip(self.METRICS, self._update_tensors(*self._to_tensors(batch)).tolist()))
+
+    # ---- CUDA graph: capture the whole update once, then replay it every step ----
+    # Each eager update launches ~100 tiny kernels; at batch 256 the GPU idles while
+    # Python launches them. A replay is a single launch. Same math as eager mode.
+    def _graph_update(self, batch: dict):
+        if self._graph is None:
+            self._static = self._to_tensors(batch)              # fixed input buffers
+            self._metric_sum = torch.zeros(len(self.METRICS), device=self.device)
+            side = torch.cuda.Stream()
+            side.wait_stream(torch.cuda.current_stream())
+            with torch.cuda.stream(side):                       # warm-up (required before capture)
+                for _ in range(3):
+                    self._metric_sum += self._update_tensors(*self._static)
+            torch.cuda.current_stream().wait_stream(side)
+            self._n_metrics = 3
+            self._graph = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(self._graph):
+                self._metric_sum += self._update_tensors(*self._static)
+        else:
+            for dst, f in zip(self._static, ReplayBuffer.FIELDS):
+                dst.copy_(torch.from_numpy(batch[f]))
+        self._graph.replay()
+        self._n_metrics += 1
+        return None
+
+    def pop_metrics(self) -> dict:
+        """Mean metrics since the last call (CUDA-graph mode). One GPU->CPU sync."""
+        vals = (self._metric_sum / max(self._n_metrics, 1)).tolist()
+        self._metric_sum.zero_()
+        self._n_metrics = 0
+        return dict(zip(self.METRICS, vals))
+
+    def _update_tensors(self, obs, action, reward, next_obs, terminated) -> torch.Tensor:
         # ---- 1) Critic update: soft policy evaluation ----
         y = self.critic_target(reward, next_obs, terminated)
         q1, q2 = self.q1(obs, action), self.q2(obs, action)
         critic_loss = F.mse_loss(q1, y) + F.mse_loss(q2, y)
-        self.critic_opt.zero_grad()
+        # set_to_none=False keeps grad tensors at fixed addresses (needed for CUDA graphs)
+        self.critic_opt.zero_grad(set_to_none=False)
         critic_loss.backward()
         self.critic_opt.step()
 
@@ -257,7 +303,7 @@ class SAC:
         q_new = torch.min(self.q1(obs, new_a), self.q2(obs, new_a))
         alpha = self.log_alpha.exp().detach()
         actor_loss = (alpha * logp - q_new).mean()
-        self.actor_opt.zero_grad()
+        self.actor_opt.zero_grad(set_to_none=False)
         actor_loss.backward()
         self.actor_opt.step()
         # (actor_loss.backward() also wrote gradients into the critics; they are
@@ -267,7 +313,7 @@ class SAC:
         # entropy too low (logp large) -> alpha increases -> more exploration
         alpha_loss = -(self.log_alpha * (logp.detach() + self.target_entropy)).mean()
         if self.auto_alpha:
-            self.alpha_opt.zero_grad()
+            self.alpha_opt.zero_grad(set_to_none=False)
             alpha_loss.backward()
             self.alpha_opt.step()
 
@@ -275,20 +321,14 @@ class SAC:
         self._soft_update(self.q1, self.q1_target)
         self._soft_update(self.q2, self.q2_target)
 
-        return {
-            "critic_loss": critic_loss.item(),
-            "actor_loss": actor_loss.item(),
-            "alpha_loss": alpha_loss.item(),
-            "alpha": self.alpha,
-            "q_mean": q1.mean().item(),
-            "entropy": (-logp.mean()).item(),
-        }
+        # stacked on the GPU: no per-metric .item() sync
+        return torch.stack([critic_loss, actor_loss, alpha_loss, self.log_alpha.exp(),
+                            q1.mean(), -logp.mean()]).detach()
 
     @torch.no_grad()
     def _soft_update(self, net, target):
-        # theta_target <- tau * theta + (1 - tau) * theta_target
-        for p, p_t in zip(net.parameters(), target.parameters()):
-            p_t.mul_(1.0 - self.tau).add_(self.tau * p)
+        # theta_target <- tau * theta + (1 - tau) * theta_target   (one fused kernel per net)
+        torch._foreach_lerp_(list(target.parameters()), list(net.parameters()), self.tau)
 
     # ----------------------------------------------------------- checkpoints
     def save(self, path):

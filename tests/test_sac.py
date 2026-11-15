@@ -125,6 +125,29 @@ def test_save_load_roundtrip():
     assert np.isclose(agent.alpha, agent2.alpha)
 
 
+
+def test_cuda_graph_update_learns_like_eager():
+    """Graph replay must apply every update to fresh batches: Q -> r on terminal transitions."""
+    if not torch.cuda.is_available():
+        return
+    buf = ReplayBuffer(OBS, ACT, capacity=1000, seed=0)
+    _fill(buf, 1000, reward=1.0, terminated=1.0)
+    agent = SAC(OBS, ACT, device="cuda", seed=0, cuda_graph=True)
+    eager = SAC(OBS, ACT, device="cuda", seed=0)
+    for _ in range(300):
+        batch = buf.sample(256)
+        assert agent.update(batch) is None
+        eager.update(batch)
+    m = agent.pop_metrics()
+    assert all(np.isfinite(v) for v in m.values())
+    obs = torch.as_tensor(buf.obs[:256], device="cuda")
+    act = torch.as_tensor(buf.action[:256], device="cuda")
+    with torch.no_grad():
+        q_graph = agent.q1(obs, act).mean().item()
+        q_eager = eager.q1(obs, act).mean().item()
+    assert abs(q_graph - 1.0) < 0.1 and abs(q_eager - 1.0) < 0.1, (q_graph, q_eager)
+
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for t in tests:

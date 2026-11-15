@@ -65,6 +65,7 @@ class NavConfig:
 
     # --- random layout generation (only used when layout == "random") ---
     n_obstacles: int = 4
+    random_endpoints: bool = True     # False -> keep `start`/`goal` above, randomize only obstacles
     obstacle_radius_range: tuple = (0.5, 1.2)
     passage_width: float = 0.6        # min free gap between obstacles and between obstacle & wall
     start_goal_clearance: float = 0.3 # min gap between start/goal and any obstacle surface
@@ -281,6 +282,8 @@ class NavigationEnv:
         r_lo, r_hi = cfg.obstacle_radius_range
         gap = cfg.passage_width
         assert gap > 2 * cfg.robot_radius, "passage_width must exceed robot diameter"
+        if not cfg.random_endpoints:
+            options = {"start": cfg.start, "goal": cfg.goal, **options}
 
         for _ in range(cfg.max_layout_tries):
             # 1) obstacles
