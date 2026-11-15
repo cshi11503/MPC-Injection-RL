@@ -1,0 +1,52 @@
+[
+  {
+    "file": "ckpt/step_03190000.pt",
+    "step": 3190000,
+    "test_success": 0.9935,
+    "test_collision": 0.0045,
+    "test_return": 20.538837270934053,
+    "test_steps_success": 43.33769501761449,
+    "val_success": 0.998,
+    "val_return": 20.661749372517054
+  },
+  {
+    "file": "ckpt/step_02610000.pt",
+    "step": 2610000,
+    "test_success": 0.9935,
+    "test_collision": 0.0065,
+    "test_return": 20.515071946852267,
+    "test_steps_success": 43.34172118772018,
+    "val_success": 0.998,
+    "val_return": 20.638058081661306
+  },
+  {
+    "file": "ckpt/step_02480000.pt",
+    "step": 2480000,
+    "test_success": 0.9915,
+    "test_collision": 0.0085,
+    "test_return": 20.46106110362449,
+    "test_steps_success": 44.48915784165406,
+    "val_success": 0.998,
+    "val_return": 20.61995137268775
+  },
+  {
+    "file": "ckpt/step_02540000.pt",
+    "step": 2540000,
+    "test_success": 0.99,
+    "test_collision": 0.0065,
+    "test_return": 20.47762111186268,
+    "test_steps_success": 43.49242424242424,
+    "val_success": 0.996,
+    "val_return": 20.5982352389301
+  },
+  {
+    "file": "ckpt/step_03215000.pt",
+    "step": 3215000,
+    "test_success": 0.989,
+    "test_collision": 0.008,
+    "test_return": 20.455521582383554,
+    "test_steps_success": 42.5010111223458,
+    "val_success": 0.998,
+    "val_return": 20.636377966781097
+  }
+]

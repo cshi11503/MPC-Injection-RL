@@ -69,7 +69,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("runs", nargs="+")
     p.add_argument("--episodes", type=int, default=10, help="stochastic episodes per checkpoint")
-    p.add_argument("--out", default="results/checkpoint_inspection.png")
+    p.add_argument("--out", default="results/fixed_obstacle/checkpoint_inspection.png")
     args = p.parse_args()
 
     import matplotlib

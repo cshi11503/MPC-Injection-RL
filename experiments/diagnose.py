@@ -157,7 +157,7 @@ def diagnose(ckpt, n_explore=20):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("ckpts", nargs="+")
-    p.add_argument("--out", default="results/diagnosis.png")
+    p.add_argument("--out", default="results/fixed_obstacle/diagnosis.png")
     args = p.parse_args()
     torch.set_num_threads(1)
 

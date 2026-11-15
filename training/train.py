@@ -14,15 +14,20 @@ Outputs in results/runs/<run_name>/:
     eval.csv         one row per evaluation (success / collision / timeout rates, return, ...)
     train_log.csv    averaged losses, alpha, Q, entropy every --log-every steps
     episodes.csv     one row per TRAINING episode (return, length, outcome)
-    best.pt, final.pt   model checkpoints
+    ckpt/step_*.pt   the top-5 policies, ranked on 500 fixed validation layouts (top5.json)
+    best.pt          the best of those 5 after re-ranking on 2000 held-out layouts
+    latest.pt, final.pt
     learning_curves.png, losses.png, trajectories.png
 """
 import argparse
 import csv
 import json
+import multiprocessing as mp
 import os
+import shutil
 import sys
 import time
+import traceback
 from collections import defaultdict, deque
 
 import numpy as np
@@ -30,7 +35,16 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents import SAC, ReplayBuffer, sample_mixed  # noqa: E402
-from environment import NavigationEnv  # noqa: E402
+from environment import NavConfig, NavigationEnv  # noqa: E402
+
+# Model selection. Every evaluation checkpoint is scored (in background processes, so training
+# never waits) with the deterministic policy on VAL_EPISODES fixed layouts; the TOP_K are kept.
+# 11 episodes (the eval.csv curve) are far too noisy to pick a best policy, and the maximum of
+# ~1000 noisy scores is biased, so the final ranking of the TOP_K uses fresh held-out layouts.
+TOP_K = 5
+VAL_EPISODES, VAL_SEED = 500, 20_000
+TEST_EPISODES, TEST_SEED = 2000, 30_000
+VAL_WORKERS = 4
 
 
 # =========================================================================
@@ -69,7 +83,8 @@ def parse_args(argv=None):
     # compute
     p.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"])
     p.add_argument("--cuda-graph", action="store_true",
-                   help="capture the SAC update as a CUDA graph (needs --device cuda; much faster)")
+                   help="replay buffers + sampling + SAC update + acting as CUDA graphs "
+                        "(needs --device cuda; much faster)")
     p.add_argument("--threads", type=int, default=4, help="torch CPU threads (keep low when running in parallel)")
     args = p.parse_args(argv)
 
@@ -83,6 +98,8 @@ def parse_args(argv=None):
         p.error("--fixed-endpoints only applies to --layout random")
     if args.cuda_graph and args.device != "cuda":
         p.error("--cuda-graph requires --device cuda")
+    if args.cuda_graph and (args.updates_per_step != 1 or args.warmup < 1):
+        p.error("--cuda-graph requires --updates-per-step 1 and --warmup >= 1")
     if args.run_name is None:
         r_tag = f"_r{args.obstacle_radius:g}" if args.obstacle_radius is not None else ""
         e_tag = "_fixedends" if args.fixed_endpoints else ""
@@ -168,6 +185,52 @@ def evaluate(agent, env, n_stochastic, seed_base):
     return row, det["trajectory"], [e["trajectory"] for e in sto]
 
 
+def rollout_batch(actor, env_cfg, seeds):
+    """
+    Deterministic policy on the layouts given by `seeds`; all episodes advance in lockstep so
+    each step is ONE batched actor call. Returns per-episode (success, collision, return, steps).
+    """
+    envs = [NavigationEnv(NavConfig(**env_cfg)) for _ in seeds]
+    obs = np.stack([e.reset(seed=int(s))[0] for e, s in zip(envs, seeds)])
+    n = len(envs)
+    out = np.zeros((n, 4))
+    active = list(range(n))
+    while active:
+        with torch.no_grad():
+            acts = actor(torch.from_numpy(obs[active]), deterministic=True, with_log_prob=False)[0].numpy()
+        still = []
+        for a, i in zip(acts, active):
+            obs[i], r, term, trunc, info = envs[i].step(a)
+            out[i, 2] += r
+            if term or trunc:
+                out[i, 0], out[i, 1], out[i, 3] = info["is_success"], info["is_collision"], info["t"]
+            else:
+                still.append(i)
+        active = still
+    return out
+
+
+def score_checkpoint(path, env_cfg, hidden, meta, n_stochastic):
+    """Worker process (CPU): eval.csv row (same protocol as before) + validation score."""
+    torch.set_num_threads(1)
+    env = NavigationEnv(NavConfig(**env_cfg))
+    agent = SAC(env.obs_dim, env.action_dim, hidden=tuple(hidden), seed=meta["step"])
+    agent.load(path)
+    row, det_traj, _ = evaluate(agent, env, n_stochastic, seed_base=10_000)
+    val = rollout_batch(agent.actor, env_cfg, range(VAL_SEED, VAL_SEED + VAL_EPISODES))
+    row = {**meta, **row, "val_success": val[:, 0].mean(), "val_collision": val[:, 1].mean(),
+           "val_return": val[:, 2].mean()}
+    return path, row, det_traj
+
+
+def test_checkpoint(path, env_cfg, hidden, seeds):
+    torch.set_num_threads(1)
+    env = NavigationEnv(NavConfig(**env_cfg))
+    agent = SAC(env.obs_dim, env.action_dim, hidden=tuple(hidden))
+    agent.load(path)
+    return rollout_batch(agent.actor, env_cfg, seeds)
+
+
 # =========================================================================
 # CSV helper
 # =========================================================================
@@ -216,6 +279,33 @@ def train(args):
             raise ValueError(f"MPC data obs_dim {mpc_buffer.obs.shape[1]} != env obs_dim {env.obs_dim}")
         print(f"Loaded MPC dataset: {len(mpc_buffer)} transitions from {args.mpc_data}")
 
+    # ---- checkpoint scoring in background processes; results come back through on_scored ----
+    ckpt_dir = os.path.join(run_dir, "ckpt")
+    os.makedirs(ckpt_dir, exist_ok=True)
+    pool = mp.get_context("spawn").Pool(VAL_WORKERS)
+    env_cfg = env.config_dict()
+    eval_rows, eval_trajs, top, pending = [], [], [], []   # top: [(key, path, row)], best first
+
+    def on_scored(result):
+        try:
+            path, row, det_traj = result
+            eval_log.log(row)
+            eval_rows.append(row)
+            eval_trajs.append((row["step"], det_traj, row["det_event"]))
+            top.append(((row["val_success"], row["val_return"]), path, row))
+            top.sort(key=lambda t: t[0], reverse=True)
+            for _, dropped, _ in top[TOP_K:]:
+                os.remove(dropped)
+            del top[TOP_K:]
+            with open(os.path.join(run_dir, "top5.json"), "w") as f:
+                json.dump([{"file": os.path.relpath(p_, run_dir), "step": r["step"], "val_success": r["val_success"],
+                            "val_return": r["val_return"]} for _, p_, r in top], f, indent=2)
+            print(f"  [eval ] step {row['step']:7d} | val({VAL_EPISODES} layouts, det): succ {row['val_success']:.3f} "
+                  f"coll {row['val_collision']:.3f} R={row['val_return']:6.2f} | sto: succ {row['sto_success_rate']:.2f} "
+                  f"| top-{TOP_K} steps: {[r['step'] for _, _, r in top]}", flush=True)
+        except Exception:                        # never let a bookkeeping error stall the result thread
+            traceback.print_exc()
+
     eval_log = CSVLogger(os.path.join(run_dir, "eval.csv"))
     train_log = CSVLogger(os.path.join(run_dir, "train_log.csv"))
     ep_log = CSVLogger(os.path.join(run_dir, "episodes.csv"))
@@ -227,21 +317,32 @@ def train(args):
     ep_return, ep_len, n_episodes = 0.0, 0, 0
     recent = deque(maxlen=20)                    # outcomes of the last 20 training episodes
     loss_acc = defaultdict(list)
-    best_key, first_hit_step = None, None
-    eval_trajs = []                              # (step, det trajectory) for the trajectory plot
+    transition = None                            # CUDA-graph mode: transition not yet stored on the GPU
     t0 = time.time()
 
     for step in range(1, args.total_steps + 1):
         # ---- 1) act ----
+        graph = args.cuda_graph and step > args.warmup
         if step <= args.warmup:
             action = env.sample_action()         # uniform random exploration
+        elif graph:
+            if step == args.warmup + 1:
+                agent.start_graph(rl_buffer, mpc_buffer, args.batch_size, args.rho)
+                t_learn, step_learn = time.time(), step
+            action = agent.graph_act(obs)        # stochastic SAC policy (after all updates so far)
+            # ---- 3) learn: store the previous transition + one SAC update, all on the GPU.
+            # Launched BEFORE the env step and not waited for: GPU and CPU work in parallel.
+            agent.graph_update(transition)
         else:
             action = agent.act(obs)              # stochastic SAC policy
 
         # ---- 2) environment step + store transition ----
         next_obs, reward, terminated, truncated, info = env.step(action)
         # terminated (goal / collision) stops bootstrapping; truncation (time limit) does NOT
-        rl_buffer.add(obs, action, reward, next_obs, terminated)
+        if graph:
+            transition = (obs, action, reward, next_obs, terminated)
+        else:
+            rl_buffer.add(obs, action, reward, next_obs, terminated)
         obs = next_obs
         ep_return += reward
         ep_len += 1
@@ -255,12 +356,12 @@ def train(args):
             obs, _ = env.reset()
             ep_return, ep_len = 0.0, 0
 
-        # ---- 3) learn ----
-        if step > args.warmup:
+        # ---- 3) learn (eager mode) ----
+        if step > args.warmup and not graph:
             for _ in range(args.updates_per_step):
                 batch = sample_mixed(rl_buffer, mpc_buffer, args.batch_size, args.rho)
-                metrics = agent.update(batch)          # None in CUDA-graph mode (kept on GPU)
-                for k, v in (metrics or {}).items():
+                metrics = agent.update(batch)
+                for k, v in metrics.items():
                     loss_acc[k].append(v)
 
         # ---- 4) log training statistics ----
@@ -276,32 +377,52 @@ def train(args):
                   f"timeout {recent.count('timeout'):2d} | critic {row['critic_loss']:.3f} | "
                   f"Q {row['q_mean']:6.2f} | alpha {row['alpha']:.3f} | entropy {row['entropy']:5.2f}", flush=True)
 
-        # ---- 5) evaluate ----
+        # ---- 5) checkpoint; evaluation + validation run in the background pool ----
         if step % args.eval_every == 0:
-            row, det_traj, _ = evaluate(agent, eval_env, args.eval_episodes, seed_base=10_000)
-            row = {"step": step, "episodes": n_episodes, "time_s": time.time() - t0, **row}
-            eval_log.log(row)
-            eval_trajs.append((step, det_traj, row["det_event"]))
-            agent.save(os.path.join(run_dir, "latest.pt"))   # most recent policy, for inspection mid-run
-
-            # sample efficiency: first eval where stochastic success rate >= threshold
-            if first_hit_step is None and row["sto_success_rate"] >= args.success_threshold:
-                first_hit_step = step
-            # best checkpoint: success first, then return
-            key = (row["det_success"] + row["sto_success_rate"], row["sto_return_mean"])
-            if best_key is None or key > best_key:
-                best_key = key
-                agent.save(os.path.join(run_dir, "best.pt"))
-
-            sps = step / (time.time() - t0)
-            alpha = agent.alpha
-            print(f"step {step:7d} | det: {row['det_event']:>13s} R={row['det_return']:7.2f} "
-                  f"| sto: succ {row['sto_success_rate']:.2f} coll {row['sto_collision_rate']:.2f} "
-                  f"R={row['sto_return_mean']:7.2f} | train succ(last20) "
-                  f"{recent.count('goal') / max(len(recent), 1):.2f} | alpha {alpha:.3f} "
-                  f"| {sps:5.1f} steps/s | ETA {(args.total_steps - step) / sps / 60:5.1f} min", flush=True)
+            path = os.path.join(ckpt_dir, f"step_{step:08d}.pt")
+            agent.save(path)
+            shutil.copyfile(path, os.path.join(run_dir, "latest.pt"))   # most recent policy, for inspection mid-run
+            meta = {"step": step, "episodes": n_episodes, "time_s": time.time() - t0}
+            pending.append(pool.apply_async(score_checkpoint, (path, env_cfg, args.hidden, meta, args.eval_episodes),
+                                            callback=on_scored))
+            now = time.time()
+            sps = (step - step_learn) / (now - t_learn) if graph and step > step_learn else step / (now - t0)
+            print(f"step {step:7d} | train succ(last20) {recent.count('goal') / max(len(recent), 1):.2f} "
+                  f"| {sps:6.1f} steps/s | ETA {(args.total_steps - step) / sps / 60:5.1f} min", flush=True)
 
     agent.save(os.path.join(run_dir, "final.pt"))
+    wall_time_min = (time.time() - t0) / 60
+    for res in pending:                          # wait for the background scoring (raises worker errors)
+        res.get()
+
+    # ---- final ranking of the top-K on held-out layouts ----
+    chunks = np.array_split(np.arange(TEST_SEED, TEST_SEED + TEST_EPISODES), VAL_WORKERS)
+    ranking = []
+    for _, path, r in top:
+        test = np.concatenate(pool.starmap(test_checkpoint, [(path, env_cfg, args.hidden, c) for c in chunks]))
+        ranking.append({"file": os.path.relpath(path, run_dir), "step": r["step"],
+                        "test_success": test[:, 0].mean(), "test_collision": test[:, 1].mean(),
+                        "test_return": test[:, 2].mean(), "test_steps_success": test[test[:, 0] == 1, 3].mean(),
+                        "val_success": r["val_success"], "val_return": r["val_return"]})
+    pool.close()
+    ranking.sort(key=lambda r: (r["test_success"], r["test_return"]), reverse=True)
+    with open(os.path.join(run_dir, "top5.json"), "w") as f:
+        json.dump(ranking, f, indent=2)
+    if ranking:
+        shutil.copyfile(os.path.join(run_dir, ranking[0]["file"]), os.path.join(run_dir, "best.pt"))
+    print(f"\nTop-{TOP_K} policies, ranked on {TEST_EPISODES} held-out layouts (deterministic policy):")
+    for r in ranking:
+        print(f"  step {r['step']:7d} | test succ {r['test_success']:.4f} coll {r['test_collision']:.4f} "
+              f"R={r['test_return']:6.2f} | val succ {r['val_success']:.3f} | {r['file']}")
+
+    # background results arrive out of order: rewrite eval.csv sorted by step
+    eval_log.close()
+    eval_rows.sort(key=lambda r: r["step"])
+    eval_trajs.sort(key=lambda t: t[0])
+    eval_log = CSVLogger(eval_log.path)
+    for r in eval_rows:
+        eval_log.log(r)
+    first_hit_step = next((r["step"] for r in eval_rows if r["sto_success_rate"] >= args.success_threshold), None)
     for lg in (eval_log, train_log, ep_log):
         lg.close()
 
@@ -313,7 +434,8 @@ def train(args):
         "episodes": n_episodes,
         "steps_to_success_threshold": first_hit_step,
         "success_threshold": args.success_threshold,
-        "wall_time_min": (time.time() - t0) / 60,
+        "wall_time_min": wall_time_min,
+        "top5": ranking,
     }
     with open(os.path.join(run_dir, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)

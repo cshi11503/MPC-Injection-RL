@@ -420,7 +420,7 @@ if __name__ == "__main__":
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    os.makedirs("results", exist_ok=True)
+    os.makedirs("results/env_demo", exist_ok=True)
     env = NavigationEnv()   # baseline: fixed center-circle layout
 
     # 1) Six random-policy rollouts on the baseline layout
@@ -436,7 +436,7 @@ if __name__ == "__main__":
                                 f"T={info['t']}, R={ret:.1f}")
     fig.suptitle("Random policy on the baseline layout")
     fig.tight_layout()
-    fig.savefig("results/env_demo_random.png", dpi=110)
+    fig.savefig("results/env_demo/env_demo_random.png", dpi=110)
 
     # 2) A simple proportional-derivative "go to goal" controller (ignores obstacles)
     fig, ax = plt.subplots(figsize=(5, 5))
@@ -450,6 +450,6 @@ if __name__ == "__main__":
         done = term or trunc
     env.render(ax=ax, title=f"PD (ignores obstacle): {info['event'] or 'timeout'}, R={ret:.1f}")
     fig.tight_layout()
-    fig.savefig("results/env_demo_pd.png", dpi=110)
+    fig.savefig("results/env_demo/env_demo_pd.png", dpi=110)
 
-    print("obs_dim =", env.obs_dim, "| saved results/env_demo_random.png, results/env_demo_pd.png")
+    print("obs_dim =", env.obs_dim, "| saved results/env_demo/env_demo_random.png, results/env_demo/env_demo_pd.png")

@@ -126,26 +126,38 @@ def test_save_load_roundtrip():
 
 
 
-def test_cuda_graph_update_learns_like_eager():
-    """Graph replay must apply every update to fresh batches: Q -> r on terminal transitions."""
-    if not torch.cuda.is_available():
-        return
-    buf = ReplayBuffer(OBS, ACT, capacity=1000, seed=0)
-    _fill(buf, 1000, reward=1.0, terminated=1.0)
-    agent = SAC(OBS, ACT, device="cuda", seed=0, cuda_graph=True)
-    eager = SAC(OBS, ACT, device="cuda", seed=0)
-    for _ in range(300):
-        batch = buf.sample(256)
-        assert agent.update(batch) is None
-        eager.update(batch)
-    m = agent.pop_metrics()
-    assert all(np.isfinite(v) for v in m.values())
-    obs = torch.as_tensor(buf.obs[:256], device="cuda")
-    act = torch.as_tensor(buf.action[:256], device="cuda")
-    with torch.no_grad():
-        q_graph = agent.q1(obs, act).mean().item()
-        q_eager = eager.q1(obs, act).mean().item()
-    assert abs(q_graph - 1.0) < 0.1 and abs(q_eager - 1.0) < 0.1, (q_graph, q_eager)
+def test_graph_training_learns_like_eager():
+    """start_graph / graph_update / graph_act must store transitions, sample fresh batches and
+    apply every update: Q -> r on terminal transitions (RL rows r=1, MPC rows r=3, new rows r=2).
+    Runs the logic eagerly on CPU first, then as real CUDA graphs."""
+    for device in ["cpu"] + (["cuda"] if torch.cuda.is_available() else []):
+        np.random.seed(0)
+        buf = ReplayBuffer(OBS, ACT, capacity=1000, seed=0)
+        _fill(buf, 500, reward=1.0, terminated=1.0)
+        mpc = ReplayBuffer(OBS, ACT, capacity=300, seed=0)
+        _fill(mpc, 300, reward=3.0, terminated=1.0)
+        agent = SAC(OBS, ACT, device=device, seed=0, cuda_graph=device == "cuda")
+        eager = SAC(OBS, ACT, device=device, seed=0)
+        agent.start_graph(buf, mpc, batch_size=256, rho=0.5)
+        new_obs = np.random.randn(OBS).astype(np.float32) + 5.0     # far from the initial data
+        actions = set()
+        for i in range(1500):                                       # wraps the 1000-row buffer
+            actions.add(tuple(agent.graph_act(new_obs)))
+            agent.graph_update(None if i == 0 else (new_obs, np.zeros(ACT), 2.0, new_obs, 1.0))
+            eager.update(sample_mixed(buf, mpc, 256, 0.5))
+        m = agent.pop_metrics()
+        assert all(np.isfinite(v) for v in m.values())
+        assert len(actions) > 1400                                  # stochastic policy: fresh noise each call
+        t = lambda x: torch.as_tensor(x, dtype=torch.float32, device=device)
+        with torch.no_grad():
+            for a in (agent, eager):                                # MPC rows are sampled by both
+                assert abs(a.q1(t(mpc.obs), t(mpc.action)).mean().item() - 3.0) < 0.15, device
+            assert abs(eager.q1(t(buf.obs[:500]), t(buf.action[:500])).mean().item() - 1.0) < 0.15
+            # every initial row of the 1000-row buffer was overwritten by the stored transitions
+            q_new = agent.q1(t(new_obs)[None], torch.zeros(1, ACT, device=device)).item()
+            assert abs(q_new - 2.0) < 0.15, (device, q_new)
+            q_old = agent.q1(t(buf.obs[:500]), t(buf.action[:500])).mean().item()
+            assert abs(q_old - 1.0) > 0.15, "old rows should have been forgotten"
 
 
 if __name__ == "__main__":

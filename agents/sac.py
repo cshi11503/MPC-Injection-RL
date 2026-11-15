@@ -16,6 +16,7 @@ Actions are always in [-1, 1] (the env scales them by a_max).
 """
 
 import copy
+import types
 
 import numpy as np
 import torch
@@ -247,38 +248,124 @@ class SAC:
 
     METRICS = ("critic_loss", "actor_loss", "alpha_loss", "alpha", "q_mean", "entropy")
 
-    def update(self, batch: dict) -> dict | None:
-        """
-        One SAC update. Eager mode returns the metrics dict.
-        CUDA-graph mode returns None; metrics accumulate on the GPU, read them with pop_metrics().
-        """
-        if self.cuda_graph:
-            return self._graph_update(batch)
+    def update(self, batch: dict) -> dict:
+        """One eager SAC update on a host (NumPy) minibatch; returns the metrics dict."""
         return dict(zip(self.METRICS, self._update_tensors(*self._to_tensors(batch)).tolist()))
 
-    # ---- CUDA graph: capture the whole update once, then replay it every step ----
-    # Each eager update launches ~100 tiny kernels; at batch 256 the GPU idles while
-    # Python launches them. A replay is a single launch. Same math as eager mode.
-    def _graph_update(self, batch: dict):
-        if self._graph is None:
-            self._static = self._to_tensors(batch)              # fixed input buffers
-            self._metric_sum = torch.zeros(len(self.METRICS), device=self.device)
+    # ---- CUDA-graph training: buffers, sampling, update and acting all stay on the GPU ----
+    # An eager update launches ~150 tiny kernels and needs host batches copied over; the GPU
+    # idles while Python works. Here one graph replay = store transition + sample minibatch
+    # (rho of it from the MPC data) + full SAC update, and a second tiny graph = actor forward.
+    # Per env step the host only uploads one transition / one observation and reads one action.
+    # Same math as eager mode.
+    def start_graph(self, rl_buffer: ReplayBuffer, mpc_buffer: ReplayBuffer | None = None,
+                    batch_size: int = 256, rho: float = 0.0, compile: bool = True):
+        """
+        Move the replay data to the GPU and capture the graphs. Call once, after warm-up.
+        (On a CPU agent the same code runs eagerly, without graphs: used to test the logic.)
+        """
+        assert len(rl_buffer) > 0
+        dev, cap = self.device, rl_buffer.capacity
+        cuda = dev.type == "cuda"
+        pin = (lambda t: t.pin_memory()) if cuda else (lambda t: t)
+        od, ad = rl_buffer.obs.shape[1], rl_buffer.action.shape[1]
+
+        def rows(b):   # one transition per row: [obs, action, reward, next_obs, terminated]
+            n = len(b)
+            return torch.from_numpy(np.concatenate(
+                [b.obs[:n], b.action[:n], b.reward[:n, None], b.next_obs[:n], b.terminated[:n, None]], axis=1))
+
+        D = 2 * od + ad + 2
+        assert cap < 2 ** 24, "write index / size are staged as float32"
+        # A captured graph only records addresses: every tensor it touches must stay referenced
+        # (here: on self), or its memory is freed and reused while the graph still reads it.
+        self._data = data = torch.zeros(cap, D, device=dev)
+        data[:len(rl_buffer)] = rows(rl_buffer).to(dev)
+        n_mpc = int(round(rho * batch_size)) if (mpc_buffer is not None and rho > 0) else 0
+        n_rl = batch_size - n_mpc
+        self._mpc = mpc = rows(mpc_buffer).to(dev) if n_mpc else None
+
+        # Host -> GPU staging (pinned memory -> asynchronous uploads).
+        # `_row` = [transition (D), buffer row to write it to, number of valid rows]: the write
+        # position and size are tracked on the host and ride along with the transition, so the
+        # graph contains no counters. Initially it holds the newest transition and its own
+        # position: warm-up replays (and a first update without a transition) just re-store it.
+        self._ptr, self._size, self._cap = rl_buffer.ptr, len(rl_buffer), cap
+        last = (rl_buffer.ptr - 1) % cap
+        self._row_cpu = pin(torch.cat([data[last].cpu(), torch.tensor([last, self._size], dtype=torch.float32)])[None])
+        self._obs_cpu = pin(torch.zeros(1, od))
+        self._row_np, self._obs_np = self._row_cpu.numpy()[0], self._obs_cpu.numpy()[0]
+        self._row, self._obs = self._row_cpu.to(dev, copy=True), self._obs_cpu.to(dev, copy=True)
+        self._act = torch.zeros(1, ad, device=dev)
+        self._metric_sum = torch.zeros(len(self.METRICS), device=dev)
+        self._slices = (slice(0, od), slice(od, od + ad), od + ad, slice(od + ad + 1, D - 1), D - 1)
+        sl = self._slices
+
+        def update_step():
+            with torch.no_grad():
+                row = self._row
+                data.index_copy_(0, row[:, D].long(), row[:, :D])
+                # uniform over the valid rows (the clamp only guards float rounding at the top end)
+                b = data[(torch.rand(n_rl, device=dev) * row[0, D + 1]).long().clamp_(max=cap - 1)]
+                if mpc is not None:   # MPC-Injection: the rest of the minibatch comes from the MPC data
+                    b = torch.cat([b, mpc[torch.randint(0, mpc.shape[0], (n_mpc,), device=dev)]])
+            self._metric_sum += self._upd(*(b[:, c] for c in sl))
+
+        def act_step():
+            with torch.no_grad():
+                self._act.copy_(self.actor(self._obs, with_log_prob=False)[0])
+
+        def capture(fn):
+            if not cuda:
+                return types.SimpleNamespace(replay=fn)
             side = torch.cuda.Stream()
             side.wait_stream(torch.cuda.current_stream())
             with torch.cuda.stream(side):                       # warm-up (required before capture)
-                for _ in range(3):
-                    self._metric_sum += self._update_tensors(*self._static)
+                for _ in range(5):
+                    fn()
             torch.cuda.current_stream().wait_stream(side)
-            self._n_metrics = 3
-            self._graph = torch.cuda.CUDAGraph()
-            with torch.cuda.graph(self._graph):
-                self._metric_sum += self._update_tensors(*self._static)
-        else:
-            for dst, f in zip(self._static, ReplayBuffer.FIELDS):
-                dst.copy_(torch.from_numpy(batch[f]))
-        self._graph.replay()
+            graph = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(graph):
+                fn()
+            return graph
+
+        self._ugraph = None
+        if compile and cuda:
+            # Inductor fuses the many small elementwise kernels of the update (~20% faster replay).
+            try:
+                self._upd = torch.compile(self._update_tensors, mode="max-autotune-no-cudagraphs")
+                self._ugraph = capture(update_step)
+            except Exception as e:   # e.g. no C compiler / Triton on this machine
+                print(f"torch.compile unavailable ({type(e).__name__}: {e}); using the uncompiled update")
+        if self._ugraph is None:
+            self._upd = self._update_tensors
+            self._ugraph = capture(update_step)
+        self._agraph = capture(act_step)
+        self._metric_sum.zero_()
+        self._n_metrics = 0
+
+    def graph_update(self, transition=None):
+        """
+        Store `transition` = (obs, action, reward, next_obs, terminated) in the GPU buffer and run
+        one SAC update. Returns immediately: the GPU works while the host steps the environment.
+        """
+        if transition is not None:
+            for c, x in zip(self._slices, transition):
+                self._row_np[c] = x
+            self._row_np[-2] = self._ptr
+            self._ptr = (self._ptr + 1) % self._cap
+            self._size = min(self._size + 1, self._cap)
+            self._row_np[-1] = self._size
+            self._row.copy_(self._row_cpu, non_blocking=True)
+        self._ugraph.replay()
         self._n_metrics += 1
-        return None
+
+    def graph_act(self, obs) -> np.ndarray:
+        """Stochastic action from the current policy (waits for the pending update to finish)."""
+        self._obs_np[:] = obs
+        self._obs.copy_(self._obs_cpu, non_blocking=True)
+        self._agraph.replay()
+        return self._act.cpu().numpy()[0]
 
     def pop_metrics(self) -> dict:
         """Mean metrics since the last call (CUDA-graph mode). One GPU->CPU sync."""
@@ -300,14 +387,14 @@ class SAC:
         # ---- 2) Actor update: soft policy improvement ----
         # minimize E[ alpha * log pi(a|s) - min Q(s, a) ],  a = tanh(mu + sigma*eps)
         new_a, logp = self.actor(obs)
-        q_new = torch.min(self.q1(obs, new_a), self.q2(obs, new_a))
+        # critic weights are detached here: the actor loss only needs dQ/da, so backward
+        # skips the (unused) critic weight gradients
+        q_new = torch.min(self._q_frozen(self.q1, obs, new_a), self._q_frozen(self.q2, obs, new_a))
         alpha = self.log_alpha.exp().detach()
         actor_loss = (alpha * logp - q_new).mean()
         self.actor_opt.zero_grad(set_to_none=False)
         actor_loss.backward()
         self.actor_opt.step()
-        # (actor_loss.backward() also wrote gradients into the critics; they are
-        #  cleared by critic_opt.zero_grad() before the next critic step.)
 
         # ---- 3) Temperature update: keep entropy near target_entropy ----
         # entropy too low (logp large) -> alpha increases -> more exploration
@@ -324,6 +411,11 @@ class SAC:
         # stacked on the GPU: no per-metric .item() sync
         return torch.stack([critic_loss, actor_loss, alpha_loss, self.log_alpha.exp(),
                             q1.mean(), -logp.mean()]).detach()
+
+    @staticmethod
+    def _q_frozen(q, obs, action):
+        params = {k: v.detach() for k, v in q.named_parameters()}
+        return torch.func.functional_call(q, params, (obs, action))
 
     @torch.no_grad()
     def _soft_update(self, net, target):

@@ -1,0 +1,24 @@
+rho0.5 step 3190000          n=10000  success  99.17% [98.97%, 99.33%]  collision  0.57%  timeout  0.26%  return  20.51  steps(success)  43.3
+rho0.5 step 2610000          n=10000  success  99.40% [99.23%, 99.53%]  collision  0.57%  timeout  0.03%  return  20.53  steps(success)  43.2
+rho0.5 step 2480000          n=10000  success  98.93% [98.71%, 99.11%]  collision  0.92%  timeout  0.15%  return  20.42  steps(success)  44.4
+rho0.5 step 2540000          n=10000  success  98.57% [98.32%, 98.78%]  collision  0.92%  timeout  0.51%  return  20.38  steps(success)  43.4
+rho0.5 step 3215000          n=10000  success  99.01% [98.80%, 99.19%]  collision  0.81%  timeout  0.18%  return  20.47  steps(success)  42.5
+rho0 best.pt                 n=10000  success  96.57% [96.20%, 96.91%]  collision  3.22%  timeout  0.21%  return  19.83  steps(success)  42.1
+rho0 final.pt (5M)           n=10000  success  98.61% [98.36%, 98.82%]  collision  1.20%  timeout  0.19%  return  20.40  steps(success)  41.6
+MPC                          n=2000   success  99.95% [99.72%, 99.99%]  collision  0.05%  timeout -0.00%  return  20.37  steps(success)  66.7
+
+best rho=0.5 policy: rho0.5 step 2610000
+
+-- top-5 against each other --
+rho0.5 step 2610000 vs rho0.5 step 3190000 (n=10000): only rho0.5 step 2610000 solves 78, only rho0.5 step 3190000 solves 55, p=0.056; steps where both succeed 43.1 vs 43.2
+rho0.5 step 2610000 vs rho0.5 step 2480000 (n=10000): only rho0.5 step 2610000 solves 90, only rho0.5 step 2480000 solves 43, p=5.63e-05; steps where both succeed 43.1 vs 44.4
+rho0.5 step 2610000 vs rho0.5 step 2540000 (n=10000): only rho0.5 step 2610000 solves 124, only rho0.5 step 2540000 solves 41, p=6.8e-11; steps where both succeed 43.1 vs 43.4
+rho0.5 step 2610000 vs rho0.5 step 3215000 (n=10000): only rho0.5 step 2610000 solves 93, only rho0.5 step 3215000 solves 54, p=0.00163; steps where both succeed 43.1 vs 42.5
+
+-- against the MPC (same layouts) --
+rho0.5 step 2610000 (MPC subset) n=2000   success  99.40% [98.95%, 99.66%]  collision  0.55%  timeout  0.05%  return  20.53  steps(success)  43.1
+rho0.5 step 2610000 vs MPC (n=2000): only rho0.5 step 2610000 solves 1, only MPC solves 12, p=0.00342; steps where both succeed 43.1 vs 66.7
+
+-- against SAC rho=0 --
+rho0.5 step 2610000 vs rho0 best.pt (n=10000): only rho0.5 step 2610000 solves 334, only rho0 best.pt solves 51, p=4.35e-52; steps where both succeed 43.1 vs 42.0
+rho0.5 step 2610000 vs rho0 final.pt (5M) (n=10000): only rho0.5 step 2610000 solves 133, only rho0 final.pt (5M) solves 54, p=7.05e-09; steps where both succeed 43.1 vs 41.6
